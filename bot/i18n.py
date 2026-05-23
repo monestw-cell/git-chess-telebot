@@ -1,6 +1,10 @@
 """Multi-language support module."""
 
+# NOTE: i18n is currently applied to the settings menu only.
+# Other handlers use Arabic directly. Full i18n rollout is a future task.
+
 from bot.database import get_user_config
+from bot.state import user_state
 
 # Translation dictionaries
 TRANSLATIONS = {
@@ -146,10 +150,7 @@ def get_text(chat_id, key, **kwargs):
     Returns:
         Translated and formatted string
     """
-    config = get_user_config(chat_id)
-    lang = 'ar'  # default
-    if config and config.get('language'):
-        lang = config['language']
+    lang = get_lang(chat_id)
 
     translations = TRANSLATIONS.get(lang, TRANSLATIONS['ar'])
     text = translations.get(key, TRANSLATIONS['ar'].get(key, key))
@@ -163,8 +164,15 @@ def get_text(chat_id, key, **kwargs):
 
 
 def get_lang(chat_id):
-    """Get user's language code."""
+    """Get user's language code, using state cache."""
+    # Check state cache first
+    cached = user_state.get_field(chat_id, '_lang_cache')
+    if cached:
+        return cached
+    # Fall back to database
     config = get_user_config(chat_id)
+    lang = 'ar'
     if config and config.get('language'):
-        return config['language']
-    return 'ar'
+        lang = config['language']
+    user_state.set_field(chat_id, '_lang_cache', lang)
+    return lang

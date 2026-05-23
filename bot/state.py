@@ -10,6 +10,11 @@ class UserStateManager:
     def get(self, chat_id):
         """Get user state dict, creating if not exists."""
         if chat_id not in self._states:
+            # Evict old entries if too many
+            if len(self._states) > 1000:
+                keys_to_remove = list(self._states.keys())[:200]
+                for k in keys_to_remove:
+                    del self._states[k]
             self._states[chat_id] = {}
         return self._states[chat_id]
 

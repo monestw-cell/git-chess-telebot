@@ -177,6 +177,7 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
             )
 
             upd("🔄 جاري تحديث المرجع...")
+            force_used = False
             if base_commit:
                 git_ref = repo.get_git_ref(f"heads/{repo.default_branch}")
                 try:
@@ -184,6 +185,7 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                 except GithubException as ref_err:
                     logger.warning(f"Force-pushing due to: {ref_err}")
                     git_ref.edit(sha=new_commit.sha, force=True)
+                    force_used = True
             else:
                 repo.create_git_ref(
                     f"refs/heads/{repo.default_branch}", new_commit.sha
@@ -205,6 +207,8 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                 f"نصية: {text_count} | ثنائية: {binary_count}\n\n"
                 f"{repo.html_url}"
             )
+            if force_used:
+                result += "\n⚠️ تم فرض التحديث (force push)"
             if progress_msg_id:
                 try:
                     bot.edit_message_text(result, chat_id, progress_msg_id)

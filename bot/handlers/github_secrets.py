@@ -167,6 +167,7 @@ def register(bot):
     def sec_add_value(message):
         chat_id = message.chat.id
         value = message.text.strip()
+        try_delete_message(bot, chat_id, message.message_id)
         name = user_state.get_field(chat_id, 'new_secret_name', '')
         config = get_user_config(chat_id)
         repo_name = user_state.get_field(chat_id, 'current_repo')

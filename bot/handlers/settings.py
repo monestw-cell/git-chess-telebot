@@ -76,6 +76,7 @@ def register(bot):
             lang = 'ar'
         ensure_user_exists(chat_id)
         update_user_setting(chat_id, 'language', lang)
+        user_state.set_field(chat_id, '_lang_cache', lang)
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
             types.InlineKeyboardButton(
