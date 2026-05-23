@@ -112,6 +112,27 @@ def register(bot):
         )
         markup.add(
             types.InlineKeyboardButton(
+                "🌿 الفروع", callback_data="cmd_branches"
+            ),
+            types.InlineKeyboardButton(
+                "🐛 القضايا", callback_data="cmd_issues"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "🔀 PR", callback_data="cmd_prs"
+            ),
+            types.InlineKeyboardButton(
+                "⚡ Actions", callback_data="cmd_actions"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "📦 المزيد...", callback_data="cmd_more_tools"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
                 "⚙️ إعدادات", callback_data="cmd_repo_settings"
             ),
             types.InlineKeyboardButton(
@@ -128,6 +149,68 @@ def register(bot):
         )
         bot.edit_message_text(
             info, chat_id, call.message.message_id, reply_markup=markup
+        )
+
+    @bot.callback_query_handler(func=lambda c: c.data == "cmd_more_tools")
+    def cmd_more_tools(call):
+        bot.answer_callback_query(call.id)
+        chat_id = call.message.chat.id
+        repo_name = user_state.get_field(chat_id, 'current_repo')
+        if not repo_name:
+            bot.edit_message_text(
+                "❌ حدث خطأ، حاول مجدداً.",
+                chat_id, call.message.message_id
+            )
+            return
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton(
+                "👥 المتعاونون", callback_data="cmd_collabs"
+            ),
+            types.InlineKeyboardButton(
+                "📦 الإصدارات", callback_data="cmd_releases"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "🍴 Fork", callback_data="cmd_fork"
+            ),
+            types.InlineKeyboardButton(
+                "📋 Clone", callback_data="cmd_clone_info"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "📜 Commits", callback_data="cmd_commits"
+            ),
+            types.InlineKeyboardButton(
+                "⭐ النجوم", callback_data="cmd_stars"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "🔐 الأسرار", callback_data="cmd_secrets"
+            ),
+            types.InlineKeyboardButton(
+                "📂 المحرر", callback_data="cmd_editor"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "🔍 البحث", callback_data="cmd_search"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                "🔙 رجوع", callback_data="back_to_repo"
+            ),
+            types.InlineKeyboardButton(
+                "🏠 الرئيسية", callback_data="main_menu"
+            )
+        )
+        bot.edit_message_text(
+            f"📦 أدوات إضافية لـ {repo_name}:",
+            chat_id, call.message.message_id, reply_markup=markup
         )
 
     @bot.callback_query_handler(func=lambda c: c.data == "cmd_repo_settings")

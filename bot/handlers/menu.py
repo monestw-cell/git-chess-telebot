@@ -54,6 +54,10 @@ def show_main_menu(bot, chat_id):
         types.InlineKeyboardButton("⚙️ الإعدادات", callback_data="setup_now"),
         types.InlineKeyboardButton("❓ مساعدة", callback_data="help_menu")
     )
+    markup.add(
+        types.InlineKeyboardButton("📝 Gists", callback_data="cmd_gists"),
+        types.InlineKeyboardButton("🔔 الإشعارات", callback_data="cmd_notifications")
+    )
     markup.add(types.InlineKeyboardButton("📈 حالة البوت", callback_data="bot_status"))
     bot.send_message(
         chat_id,
