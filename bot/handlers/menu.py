@@ -51,7 +51,7 @@ def show_main_menu(bot, chat_id):
         types.InlineKeyboardButton("♟️ تحليل شطرنج", callback_data="start_check")
     )
     markup.add(
-        types.InlineKeyboardButton("⚙️ الإعدادات", callback_data="setup_now"),
+        types.InlineKeyboardButton("⚙️ الإعدادات", callback_data="cmd_settings"),
         types.InlineKeyboardButton("❓ مساعدة", callback_data="help_menu")
     )
     markup.add(

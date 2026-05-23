@@ -90,11 +90,30 @@ def delete_user_config(chat_id):
         conn.close()
 
 
+def ensure_user_exists(chat_id):
+    """Ensure a user record exists (for settings before GitHub setup)."""
+    conn = _get_conn()
+    try:
+        existing = conn.execute(
+            "SELECT chat_id FROM users WHERE chat_id = ?", (chat_id,)
+        ).fetchone()
+        if not existing:
+            now = datetime.now().isoformat()
+            conn.execute(
+                "INSERT INTO users (chat_id, created_at, updated_at) VALUES (?, ?, ?)",
+                (chat_id, now, now)
+            )
+            conn.commit()
+    finally:
+        conn.close()
+
+
 def update_user_setting(chat_id, key, value):
     """Update a single user setting."""
     allowed_keys = {'language', 'chess_depth', 'github_username'}
     if key not in allowed_keys:
         return
+    ensure_user_exists(chat_id)
     now = datetime.now().isoformat()
     conn = _get_conn()
     try:
