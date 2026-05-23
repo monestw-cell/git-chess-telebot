@@ -14,6 +14,8 @@ from bot.utils import clean_txt, log_error, try_delete_message
 
 logger = logging.getLogger(__name__)
 
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB - GitHub blob API practical limit
+
 
 def _search_file_recursive(repo, target_name, path=""):
     """Recursive search for a file in all repository directories."""
@@ -69,8 +71,14 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                 branch_obj = repo.get_branch(repo.default_branch)
                 base_commit = repo.get_git_commit(branch_obj.commit.sha)
                 base_tree_sha = base_commit.tree.sha
-            except Exception:
-                pass
+            except GithubException as branch_err:
+                logger.info(
+                    f"No existing branch (empty repo?): {branch_err}"
+                )
+            except Exception as branch_err:
+                logger.warning(
+                    f"Error fetching branch: {branch_err}"
+                )
 
             # Detect common root directory
             top_dirs = set()
@@ -97,10 +105,20 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                 if not file_path or file_path.endswith('/'):
                     skipped += 1
                     continue
+                if fi.file_size > MAX_FILE_SIZE:
+                    skipped += 1
+                    logger.warning(
+                        f"Skipping large file {file_path}: "
+                        f"{fi.file_size} bytes"
+                    )
+                    continue
                 try:
                     content_bytes = z.read(fi.filename)
-                except Exception:
+                except Exception as read_err:
                     skipped += 1
+                    logger.warning(
+                        f"Failed to read {file_path} from ZIP: {read_err}"
+                    )
                     continue
 
                 try:
@@ -121,13 +139,28 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                             sha=blob_obj.sha
                         ))
                         binary_count += 1
+                    except GithubException as blob_err:
+                        logger.warning(
+                            f"GitHub blob creation failed for "
+                            f"{file_path}: {blob_err}"
+                        )
+                        skipped += 1
                     except Exception as blob_err:
-                        logger.warning(f"blob failed {file_path}: {blob_err}")
+                        logger.warning(
+                            f"Blob upload failed for "
+                            f"{file_path}: {blob_err}"
+                        )
                         skipped += 1
 
             if not tree_elements:
                 upd("❌ لم يتم العثور على ملفات صالحة!")
                 return
+
+            if len(tree_elements) > 500:
+                upd(
+                    f"⚠️ عدد الملفات كبير ({len(tree_elements)}), "
+                    f"قد يستغرق وقتاً..."
+                )
 
             upd(
                 f"🔗 جاري بناء شجرة Git\n"
@@ -142,8 +175,19 @@ def _extract_and_upload(bot, repo, zip_bytes, chat_id, progress_msg_id=None):
                 message=f"رفع {len(tree_elements)} ملف عبر ZIP",
                 tree=new_tree, parents=parents
             )
-            git_ref = repo.get_git_ref(f"heads/{repo.default_branch}")
-            git_ref.edit(sha=new_commit.sha, force=False)
+
+            upd("🔄 جاري تحديث المرجع...")
+            if base_commit:
+                git_ref = repo.get_git_ref(f"heads/{repo.default_branch}")
+                try:
+                    git_ref.edit(sha=new_commit.sha, force=False)
+                except GithubException as ref_err:
+                    logger.warning(f"Force-pushing due to: {ref_err}")
+                    git_ref.edit(sha=new_commit.sha, force=True)
+            else:
+                repo.create_git_ref(
+                    f"refs/heads/{repo.default_branch}", new_commit.sha
+                )
 
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
