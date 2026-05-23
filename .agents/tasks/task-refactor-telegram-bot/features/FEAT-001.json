@@ -1,0 +1,45 @@
+{
+  "id": "FEAT-001",
+  "type": "refactor",
+  "description": "Split the monolithic main.py into a modular package structure with per-user SQLite database, encrypted token storage, proper state management, and fixed architectural issues. This is the foundation that all other features build upon.",
+  "status": "completed",
+  "steps": [
+    "Create the bot/ package directory structure: bot/__init__.py, bot/config.py, bot/database.py, bot/state.py, bot/utils.py, bot/encryption.py",
+    "Create bot/config.py: Application-level constants (STOCKFISH_PATH, DB_PATH, MAX_MESSAGE_LENGTH, etc.) loaded from environment variables. No more global CONFIG_FILE.",
+    "Create bot/encryption.py: Token encryption using cryptography.fernet. Generate/load encryption key from environment variable BOT_ENCRYPTION_KEY or a local key file. Provide encrypt_token() and decrypt_token() functions.",
+    "Create bot/database.py: SQLite-based per-user storage. Schema: users table (chat_id INTEGER PRIMARY KEY, github_token TEXT encrypted, github_username TEXT, language TEXT DEFAULT 'ar', chess_depth INTEGER DEFAULT 14, created_at TIMESTAMP, updated_at TIMESTAMP). Functions: init_db(), save_user_config(chat_id, token, username), get_user_config(chat_id), delete_user_config(chat_id). Replace the old save_config/load_config that used a shared JSON file.",
+    "Create bot/state.py: A UserState class that replaces the global user_steps/awaiting_pgn/chess_wait_msg dicts. Use a single dict keyed by chat_id containing a dataclass/dict with fields: mode, current_repo, repo_map, wf_map, awaiting_pgn, chess_wait_msg_id, waiting_zip_msg, waiting_replace_msg, file_bytes, progress_msg_id. Provide get_state(chat_id), clear_state(chat_id), and preserve important fields (repo_map, wf_map, current_repo) on clear just like the original code does.",
+    "Create bot/utils.py: Move utility functions here - clean_txt(), send_long_message(), log_error(), get_github_client(chat_id) which loads user config from DB and returns a Github instance. Fix the error_logs to be per-instance with a max size deque.",
+    "Create bot/handlers/__init__.py, bot/handlers/menu.py, bot/handlers/setup.py, bot/handlers/github_repos.py, bot/handlers/github_files.py, bot/handlers/github_workflows.py, bot/handlers/chess_handler.py",
+    "bot/handlers/menu.py: Move show_main_menu, back_to_main, show_help_menu, show_bot_status, show_account_info handlers. Update to use database.get_user_config(chat_id) instead of load_config().",
+    "bot/handlers/setup.py: Move setup flow (start_setup, get_token_step, finish_setup). Update to use database.save_user_config() and encryption.encrypt_token(). Delete the user's message containing the token for security.",
+    "bot/handlers/github_repos.py: Move list_projects, repo_selected, create/delete/rename/settings handlers. Fix the callback_data collision: replace abs(hash(repo.name)) % 100000 with a proper approach - store repo names in state.repo_map keyed by index (sel_0, sel_1, sel_2...) instead of hash-based keys.",
+    "bot/handlers/github_files.py: Move browse_files, replace_file, ZIP upload handlers (do_handle_zip, extract_and_upload, finalize_create_repo, etc.).",
+    "bot/handlers/github_workflows.py: Move list_workflows, run_workflow handlers.",
+    "bot/handlers/chess_handler.py: Move all chess-related functions (process_chess, generate_eval_graph, calculate_accuracy, etc.). Fix the double Stockfish analysis: currently generate_eval_graph runs engine.analyse in a loop AND process_chess runs another loop. Merge into a single pass that collects both evaluation scores for the graph AND move classifications simultaneously. Make chess depth configurable per user from database.",
+    "Fix bare 'except: pass' throughout all handlers - replace with 'except Exception as e: logger.warning(...)' or specific exception types. Key locations: delete_message calls (use a helper try_delete_message), the bare except in show_bot_status stockfish check, the bare excepts in account_info language loop.",
+    "Create new main.py entry point: Import bot instance, register all handlers by importing handler modules, setup Flask app, run polling. Keep it under 50 lines.",
+    "Update requirements.txt: Add cryptography, matplotlib (already used but not listed). Keep existing deps.",
+    "Update Dockerfile: No changes needed to Dockerfile since the structure change is internal."
+  ],
+  "acceptance_criteria": [
+    "Running 'python -c \"import ast; ast.parse(open(f).read())\"' succeeds for every .py file in bot/ and main.py",
+    "The bot/ package has proper __init__.py files and all imports resolve correctly when checked with 'python -c \"import bot\"' (assuming deps are installed)",
+    "No more global config.json - per-user SQLite storage in bot/database.py",
+    "Tokens are encrypted before storage using Fernet encryption",
+    "The callback_data collision risk from hash() is eliminated - using index-based keys",
+    "Chess analysis runs in a single Stockfish pass (no duplicate engine.analyse loops)",
+    "No bare 'except: pass' statements remain in the codebase",
+    "State management uses a centralized UserState approach instead of scattered global dicts",
+    "main.py is under 50 lines and simply wires everything together"
+  ],
+  "verification": [
+    "Run: find /projects/sandbox/M_bot -name '*.py' -exec python -c \"import ast; ast.parse(open('{}').read())\" \\; to verify all files parse correctly",
+    "Run: python -c \"import ast, os; [ast.parse(open(os.path.join(r,f)).read()) for r,d,fs in os.walk('/projects/sandbox/M_bot') for f in fs if f.endswith('.py')]\" to verify no syntax errors",
+    "Run: grep -r 'except:' /projects/sandbox/M_bot/bot/ /projects/sandbox/M_bot/main.py to confirm no bare excepts remain",
+    "Run: grep -r 'abs(hash(' /projects/sandbox/M_bot/ to confirm hash collision risk is eliminated",
+    "Run: grep -r 'config.json' /projects/sandbox/M_bot/bot/ /projects/sandbox/M_bot/main.py to confirm no JSON config file usage remains"
+  ],
+  "blocked_reason": null,
+  "findings": "All verification checks pass: AST parse OK for all 14 .py files, no bare excepts, no abs(hash() usage, no config.json references. main.py is 44 lines. Used python3 (not python) as the command. Network mode is INTEGRATIONS_ONLY so no package installs were possible but all files validate syntactically."
+}

@@ -5,4 +5,5 @@ flask
 urllib3<2
 requests
 certifi
-
+cryptography
+matplotlib
