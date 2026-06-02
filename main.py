@@ -69,33 +69,33 @@ def load_config():
 def clean_txt(text):
     return str(text).replace('`',"'").replace('*','').replace('_','').replace('[','(').replace(']',')')
 
+def is_sha_str(s):
+    """هل النص SHA hex؟"""
+    s = str(s).strip()
+    return len(s) >= 20 and all(c in '0123456789abcdefABCDEF' for c in s)
+
 def safe_err(e):
-    """تحويل أي استثناء لرسالة خطأ مقروءة - يمنع ظهور SHA"""
-    s = str(e).strip()
-    # إذا كانت الرسالة SHA hex أو طويلة جداً بدون مسافات
-    if len(s) > 60 and ' ' not in s and all(c in '0123456789abcdefABCDEF' for c in s):
-        return "خطأ داخلي في GitHub API - راجع /logs"
-    if len(s) > 200:
-        return s[:200] + "..."
-    return s
+    """تحويل أي استثناء لرسالة مقروءة - يمنع ظهور SHA أو بيانات تقنية"""
+    try:
+        # GithubException
+        if hasattr(e, 'status') and hasattr(e, 'data'):
+            if isinstance(e.data, dict):
+                msg = e.data.get('message') or e.data.get('error') or ''
+                if msg and not is_sha_str(msg):
+                    return f"خطأ GitHub {e.status}: {msg}"
+            return f"خطأ GitHub {e.status}"
+        s = str(e).strip()
+        if is_sha_str(s):
+            return "خطأ في GitHub API"
+        if len(s) > 150:
+            return s[:150] + "..."
+        return s or "خطأ غير معروف"
+    except:
+        return "خطأ غير معروف"
 
 def log_error(chat_id, err):
-    """تسجيل الأخطاء - يستخدم repr للأخطاء التقنية"""
-    try:
-        if hasattr(err, 'status') and hasattr(err, 'data'):
-            # GithubException
-            data = err.data
-            if isinstance(data, dict):
-                msg = data.get('message') or data.get('error') or str(err.status)
-            elif isinstance(data, str) and len(data) < 100:
-                msg = data
-            else:
-                msg = f"GitHub {err.status}"
-        else:
-            msg = str(err)[:150]
-        entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | {msg}"
-    except Exception:
-        entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | unknown error"
+    """تسجيل الأخطاء - يستخدم safe_err لمنع تسجيل SHA"""
+    entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | {safe_err(err)}"
     error_logs.append(entry)
     if len(error_logs) > 20: error_logs.pop(0)
     logger.error(entry)
@@ -582,14 +582,21 @@ def extract_and_upload(repo, zip_bytes, chat_id, progress_msg_id=None):
             except: pass
 
     def gh_err_msg(ge):
-        """استخراج رسالة خطأ GitHub بشكل آمن"""
+        """استخراج رسالة خطأ GitHub - يمنع إرجاع SHA كرسالة"""
         try:
             if isinstance(ge.data, dict):
-                return ge.data.get('message', '') or ge.data.get('error', '') or str(ge.status)
-            if isinstance(ge.data, str) and len(ge.data) < 100:
-                return ge.data
-        except: pass
-        return f"GitHub Error {getattr(ge, 'status', '')}"
+                msg = ge.data.get('message') or ge.data.get('error') or ''
+                if msg and not is_sha(msg):
+                    return msg
+            # أي شيء يبدو SHA نتجاهله
+            return f"خطأ {getattr(ge, 'status', 'GitHub')}"
+        except:
+            return "خطأ غير معروف"
+
+    def is_sha(s):
+        """هل النص SHA hex؟"""
+        s = str(s).strip()
+        return len(s) >= 20 and all(c in '0123456789abcdefABCDEF' for c in s)
 
     try:
         if not zipfile.is_zipfile(io.BytesIO(zip_bytes)):
@@ -757,6 +764,9 @@ def extract_and_upload(repo, zip_bytes, chat_id, progress_msg_id=None):
         log_error(chat_id, ge)
         upd(f"❌ خطأ GitHub ({ge.status}): {gh_err_msg(ge)}")
     except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"extract_and_upload traceback:\n{tb}")
         log_error(chat_id, e)
         upd(f"❌ خطأ أثناء الرفع: {safe_err(e)}")
 
