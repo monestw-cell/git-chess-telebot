@@ -69,8 +69,33 @@ def load_config():
 def clean_txt(text):
     return str(text).replace('`',"'").replace('*','').replace('_','').replace('[','(').replace(']',')')
 
+def safe_err(e):
+    """تحويل أي استثناء لرسالة خطأ مقروءة - يمنع ظهور SHA"""
+    s = str(e).strip()
+    # إذا كانت الرسالة SHA hex أو طويلة جداً بدون مسافات
+    if len(s) > 60 and ' ' not in s and all(c in '0123456789abcdefABCDEF' for c in s):
+        return "خطأ داخلي في GitHub API - راجع /logs"
+    if len(s) > 200:
+        return s[:200] + "..."
+    return s
+
 def log_error(chat_id, err):
-    entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | {str(err)[:200]}"
+    """تسجيل الأخطاء - يستخدم repr للأخطاء التقنية"""
+    try:
+        if hasattr(err, 'status') and hasattr(err, 'data'):
+            # GithubException
+            data = err.data
+            if isinstance(data, dict):
+                msg = data.get('message') or data.get('error') or str(err.status)
+            elif isinstance(data, str) and len(data) < 100:
+                msg = data
+            else:
+                msg = f"GitHub {err.status}"
+        else:
+            msg = str(err)[:150]
+        entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | {msg}"
+    except Exception:
+        entry = f"{datetime.now().strftime('%H:%M:%S')} | {chat_id} | unknown error"
     error_logs.append(entry)
     if len(error_logs) > 20: error_logs.pop(0)
     logger.error(entry)
@@ -284,7 +309,7 @@ def cb_account(call):
         mk.add(types.InlineKeyboardButton("🏠 الرئيسية", callback_data="main_menu"))
         bot.edit_message_text(txt, cid, mid, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, mid)
+        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, mid)
 
 # ───────────────────────── قائمة المشاريع ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "my_projects")
@@ -309,7 +334,7 @@ def cb_projects(call):
         user_steps[cid]['repo_map'] = rmap
         bot.edit_message_text(f"📁 مشاريعك ({len(repos)} مستودع) - مرتبة حسب آخر تحديث:", cid, mid, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, mid)
+        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, mid)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("sel_"))
 def cb_repo_selected(call):
@@ -379,7 +404,7 @@ def cb_browse(call):
         )
         bot.edit_message_text(txt, cid, mid, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, mid)
+        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, mid)
 
 # ───────────────────────── استبدال ملف واحد ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_replace_file")
@@ -437,7 +462,7 @@ def do_replace_file(message):
         fbytes = bot.download_file(bot.get_file(message.document.file_id).file_path)
     except Exception as e:
         log_error(cid, e)
-        bot.edit_message_text(f"❌ فشل تحميل الملف: {clean_txt(e)}", cid, pmsg.message_id)
+        bot.edit_message_text(f"❌ فشل تحميل الملف: {safe_err(e)}", cid, pmsg.message_id)
         user_steps[cid]['mode'] = None; return
     try:
         repo  = Github(config['token']).get_repo(f"{config['username']}/{name}")
@@ -480,7 +505,7 @@ def do_replace_file(message):
         bot.edit_message_text(f"❌ خطأ GitHub: {clean_txt(m)}", cid, pmsg.message_id)
     except Exception as e:
         log_error(cid, e)
-        bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, pmsg.message_id)
+        bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, pmsg.message_id)
     finally:
         user_steps[cid]['mode'] = None
 
@@ -505,7 +530,7 @@ def do_zip(message):
         zbytes = bot.download_file(bot.get_file(message.document.file_id).file_path)
     except Exception as e:
         log_error(cid, e)
-        bot.edit_message_text(f"❌ فشل التحميل: {clean_txt(e)}", cid, pmsg.message_id); return
+        bot.edit_message_text(f"❌ فشل التحميل: {safe_err(e)}", cid, pmsg.message_id); return
     if mode == 'update':
         rname = user_steps[cid].get('current_repo')
         if not rname:
@@ -516,7 +541,7 @@ def do_zip(message):
             extract_and_upload(repo, zbytes, cid, pmsg.message_id)
         except Exception as e:
             log_error(cid, e)
-            bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, pmsg.message_id)
+            bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, pmsg.message_id)
         finally:
             user_steps[cid]['mode'] = None
     elif mode == 'create':
@@ -543,8 +568,8 @@ def finalize_create(message):
         extract_and_upload(repo, zbytes, cid, pmid)
     except Exception as e:
         log_error(cid, e)
-        try:    bot.edit_message_text(f"❌ فشل: {clean_txt(e)}", cid, pmid)
-        except: bot.send_message(cid, f"❌ فشل: {clean_txt(e)}")
+        try:    bot.edit_message_text(f"❌ فشل: {safe_err(e)}", cid, pmid)
+        except: bot.send_message(cid, f"❌ فشل: {safe_err(e)}")
     finally:
         user_steps[cid]['mode'] = None
         user_steps[cid].pop('file', None)
@@ -699,11 +724,7 @@ def extract_and_upload(repo, zip_bytes, chat_id, progress_msg_id=None):
         upd(f"❌ خطأ GitHub ({ge.status}): {gh_err_msg(ge)}")
     except Exception as e:
         log_error(chat_id, e)
-        # تأكد إن الرسالة ليست SHA أو بيانات تقنية
-        err_str = str(e)
-        if len(err_str) > 80 or all(c in '0123456789abcdef' for c in err_str.strip()):
-            err_str = "فشل في رفع الملفات، راجع /logs للتفاصيل"
-        upd(f"❌ خطأ أثناء الرفع: {err_str}")
+        upd(f"❌ خطأ أثناء الرفع: {safe_err(e)}")
 
 # ───────────────────────── إنشاء مشروع ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data in ["cmd_update_repo", "create_new_repo"])
@@ -772,7 +793,7 @@ def step_empty_repo(message):
             types.InlineKeyboardButton("🏠 الرئيسية",              callback_data="main_menu"))
         bot.send_message(cid, f"✅ تم إنشاء المستودع!\n{repo.html_url}", reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.send_message(cid, f"❌ فشل الإنشاء: {clean_txt(e)}")
+        log_error(cid, e); bot.send_message(cid, f"❌ فشل الإنشاء: {safe_err(e)}")
 
 # ───────────────────────── إعدادات المستودع ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_repo_settings")
@@ -814,7 +835,7 @@ def step_rename(message):
         mk.add(types.InlineKeyboardButton("🏠 الرئيسية", callback_data="main_menu"))
         bot.reply_to(message, f"✅ تم إعادة التسمية إلى: {new}", reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.reply_to(message, f"❌ فشل: {clean_txt(e)}")
+        log_error(cid, e); bot.reply_to(message, f"❌ فشل: {safe_err(e)}")
 
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_change_desc")
 def cb_desc(call):
@@ -838,7 +859,7 @@ def step_desc(message):
         mk.add(types.InlineKeyboardButton("🏠 الرئيسية", callback_data="main_menu"))
         bot.reply_to(message, "✅ تم تحديث الوصف بنجاح!", reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.reply_to(message, f"❌ فشل: {clean_txt(e)}")
+        log_error(cid, e); bot.reply_to(message, f"❌ فشل: {safe_err(e)}")
 
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_toggle_vis")
 def cb_toggle_vis(call):
@@ -855,7 +876,7 @@ def cb_toggle_vis(call):
         mk.add(types.InlineKeyboardButton("🏠 الرئيسية", callback_data="main_menu"))
         bot.edit_message_text(f"✅ تم تغيير {name} إلى {st}", cid, mid, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ فشل: {clean_txt(e)}", cid, mid)
+        log_error(cid, e); bot.edit_message_text(f"❌ فشل: {safe_err(e)}", cid, mid)
 
 # ───────────────────────── Workflows ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_workflows")
@@ -882,7 +903,7 @@ def cb_workflows(call):
         txt = f"⚡ Workflows في {name}:" if workflows else f"ℹ️ لا يوجد Workflows في {name}."
         bot.edit_message_text(txt, cid, mid, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, mid)
+        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, mid)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("run_wf_"))
 def cb_run_wf(call):
@@ -908,7 +929,7 @@ def cb_run_wf(call):
         else:
             bot.edit_message_text(f"❌ فشل: {clean_txt(r.json().get('message', r.text))}", cid, call.message.message_id, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {clean_txt(e)}", cid, call.message.message_id)
+        log_error(cid, e); bot.edit_message_text(f"❌ خطأ: {safe_err(e)}", cid, call.message.message_id)
 
 # ───────────────────────── حذف المستودع ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "cmd_delete_repo")
@@ -937,7 +958,7 @@ def cb_execute_delete(call):
         mk.add(types.InlineKeyboardButton("🏠 الرئيسية", callback_data="main_menu"))
         bot.edit_message_text(f"✅ تم حذف {name} بنجاح.", cid, call.message.message_id, reply_markup=mk)
     except Exception as e:
-        log_error(cid, e); bot.edit_message_text(f"❌ فشل: {clean_txt(e)}", cid, call.message.message_id)
+        log_error(cid, e); bot.edit_message_text(f"❌ فشل: {safe_err(e)}", cid, call.message.message_id)
 
 # ───────────────────────── الإعداد ─────────────────────────
 @bot.callback_query_handler(func=lambda c: c.data == "setup_now")
