@@ -684,19 +684,53 @@ def extract_and_upload(repo, zip_bytes, chat_id, progress_msg_id=None):
                 tree=new_tree,
                 parents=parents)
 
-            # تحديث رأس الفرع - مع دعم المستودع الجديد الفارغ
+            # ── تحديث رأس الفرع ──
             default_br = repo.default_branch
+            ref_updated = False
+
+            # محاولة 1: تحديث ref موجود
             try:
                 git_ref = repo.get_git_ref(f"heads/{default_br}")
-                git_ref.edit(sha=new_commit.sha, force=True)
-            except GithubException as ge:
-                if ge.status == 404:
-                    # مستودع جديد - إنشاء الـ ref
-                    repo.create_git_ref(
-                        ref=f"refs/heads/{default_br}",
-                        sha=new_commit.sha)
+                # استخدام requests مباشرة لتجنب مشاكل PyGithub مع edit()
+                config_data = load_config()
+                patch_url = f"https://api.github.com/repos/{config_data['username']}/{repo.name}/git/refs/heads/{default_br}"
+                r = requests.patch(
+                    patch_url,
+                    headers={
+                        "Authorization": f"token {config_data['token']}",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    json={"sha": new_commit.sha, "force": True},
+                    timeout=30
+                )
+                if r.status_code in (200, 201):
+                    ref_updated = True
                 else:
-                    raise ge
+                    logger.warning(f"PATCH ref failed: {r.status_code} {r.text[:100]}")
+            except GithubException as ge:
+                if ge.status != 404:
+                    logger.warning(f"get_git_ref failed: {ge.status}")
+
+            # محاولة 2: إنشاء ref جديد (مستودع فارغ)
+            if not ref_updated:
+                try:
+                    config_data = load_config()
+                    post_url = f"https://api.github.com/repos/{config_data['username']}/{repo.name}/git/refs"
+                    r = requests.post(
+                        post_url,
+                        headers={
+                            "Authorization": f"token {config_data['token']}",
+                            "Accept": "application/vnd.github.v3+json"
+                        },
+                        json={"ref": f"refs/heads/{default_br}", "sha": new_commit.sha},
+                        timeout=30
+                    )
+                    if r.status_code in (200, 201):
+                        ref_updated = True
+                    else:
+                        raise Exception(f"فشل إنشاء الفرع: {r.json().get('message', r.status_code)}")
+                except Exception as re:
+                    raise Exception(f"فشل تحديث الفرع: {re}")
 
             mk = types.InlineKeyboardMarkup(row_width=1)
             mk.add(
