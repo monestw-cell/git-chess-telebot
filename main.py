@@ -196,7 +196,8 @@ def cb_main(call):
     bot.answer_callback_query(call.id)
     clear_user_state(call.message.chat.id)
     try: bot.delete_message(call.message.chat.id, call.message.message_id)
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
     show_main_menu(call.message.chat.id)
 
 # ───────────────────────── مساعدة ─────────────────────────
@@ -284,7 +285,8 @@ def cb_account(call):
         for r in repos[:20]:
             try:
                 for l, b in r.get_languages().items(): langs[l] = langs.get(l,0)+b
-            except: pass
+            except Exception as e:
+                logging.debug(f"Handled non-fatal error: {e}")
         top = sorted(langs.items(), key=lambda x: x[1], reverse=True)[:3]
         ls  = " | ".join(l[0] for l in top) if top else "غير محدد"
         try:
@@ -434,7 +436,8 @@ def search_recursive(repo, target, path=""):
                 if r: return r
             elif item.name == target:
                 return {"path": item.path, "sha": item.sha}
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
     return None
 
 # ───────────────────────── معالج الملفات الموحد ─────────────────────────
@@ -456,7 +459,8 @@ def do_replace_file(message):
     wid = user_steps[cid].pop('waiting_replace_msg', None)
     if wid:
         try: bot.delete_message(cid, wid)
-        except: pass
+        except Exception as e:
+            logging.debug(f"Handled non-fatal error: {e}")
     pmsg = bot.reply_to(message, f"🔍 جاري البحث عن '{fname}' في {name}...")
     try:
         fbytes = bot.download_file(bot.get_file(message.document.file_id).file_path)
@@ -522,7 +526,8 @@ def do_zip(message):
     wid = user_steps[cid].pop('waiting_zip_msg', None)
     if wid:
         try: bot.delete_message(cid, wid)
-        except: pass
+        except Exception as e:
+            logging.debug(f"Handled non-fatal error: {e}")
     if message.document.file_size > 50 * 1024 * 1024:
         bot.reply_to(message, "❌ حجم الملف يتجاوز 50MB."); return
     pmsg = bot.reply_to(message, "⏳ جاري تحميل الملف...")
@@ -579,7 +584,8 @@ def extract_and_upload(repo, zip_bytes, chat_id, progress_msg_id=None):
     def upd(txt):
         if progress_msg_id:
             try: bot.edit_message_text(txt, chat_id, progress_msg_id)
-            except: pass
+            except Exception as e:
+                logging.debug(f"Handled non-fatal error: {e}")
 
     def gh_err_msg(ge):
         """استخراج رسالة خطأ GitHub - يمنع إرجاع SHA كرسالة"""
@@ -819,7 +825,8 @@ def cb_zip_empty(call):
     msg = bot.send_message(cid, "📭 أرسل اسم المستودع الجديد:", reply_markup=mk)
     bot.register_next_step_handler(msg, step_empty_repo)
     try: bot.delete_message(cid, call.message.message_id)
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
 
 def step_empty_repo(message):
     cid, rname = message.chat.id, message.text.strip().replace(" ", "-")
@@ -866,7 +873,8 @@ def cb_rename(call):
     msg = bot.send_message(cid, f"✏️ أرسل الاسم الجديد للمستودع {name}:", reply_markup=mk)
     bot.register_next_step_handler(msg, step_rename)
     try: bot.delete_message(cid, call.message.message_id)
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
 
 def step_rename(message):
     cid, new = message.chat.id, message.text.strip().replace(" ", "-")
@@ -891,7 +899,8 @@ def cb_desc(call):
     msg = bot.send_message(cid, f"📝 أرسل الوصف الجديد للمستودع {name}:", reply_markup=mk)
     bot.register_next_step_handler(msg, step_desc)
     try: bot.delete_message(cid, call.message.message_id)
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
 
 def step_desc(message):
     cid = message.chat.id
@@ -1022,7 +1031,8 @@ def start_setup(message):
 def step_token(message):
     token = message.text.strip()
     try: bot.delete_message(message.chat.id, message.message_id)
-    except: pass
+    except Exception as e:
+        logging.debug(f"Handled non-fatal error: {e}")
     try:
         user = Github(token).get_user()
         mk = types.InlineKeyboardMarkup()
@@ -1079,7 +1089,8 @@ def receive_pgn(message):
     wid = chess_wait_msg.pop(cid, None)
     if wid:
         try: bot.delete_message(cid, wid)
-        except: pass
+        except Exception as e:
+            logging.debug(f"Handled non-fatal error: {e}")
     process_chess(message, message.text)
 
 def process_chess(message, pgn_data):
@@ -1172,7 +1183,8 @@ def process_chess(message, pgn_data):
             res += "🎯 أبرز اللحظات:\n\n" + "\n\n".join(moments[:8])
 
         try: bot.delete_message(message.chat.id, msg_wait.message_id)
-        except: pass
+        except Exception as e:
+            logging.debug(f"Handled non-fatal error: {e}")
         if graph:
             bot.send_photo(message.chat.id, graph, caption="📈 رسم تقييم المباراة")
         mk = types.InlineKeyboardMarkup()
