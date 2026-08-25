@@ -1,64 +1,47 @@
-# Chess Telegram Bot (بوت الشطرنج التفاعلي) ♟️🤖
+# Interactive Chess Telegram Bot ♟️🤖
 
-بوت تيليجرام تفاعلي متقدم للعب وتحليل مباريات الشطرنج فردياً ومع الأصدقاء داخل محادثات ومجموعات Telegram.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![pyTelegramBotAPI](https://img.shields.io/badge/Library-pyTelegramBotAPI-2CA5E0?logo=telegram&logoColor=white)](https://github.com/eternnoir/pyTelegramBotAPI)
+[![Docker](https://img.shields.io/badge/Container-Docker-2496ED?logo=docker&logoColor=white)](https://docker.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
-
-## 🌟 نبذة عن المشروع (Overview)
-
-**Chess Telegram Bot** هو بوت تلغرام ذكي مبني بلغة بايثون، يتيح للمستخدمين والمجموعات خوض مباريات شطرنج مباشرة مع واجهة تفاعلية مرئية لتوليد رقعة الشطرنج وتحديثها تلقائياً بعد كل نقلة، بالإضافة إلى دعم تحليل المواقف وتوليد سجلات المباريات بصيغة PGN.
-
----
-
-## ✨ المميزات الرئيسية (Key Features)
-
-- **اللعب التفاعلي المباشر:** لوحة شطرنج رسومية تفاعلية تعتمد على أزرار التلغرام (Inline Keyboard).
-- **أنماط لعب متعددة:**
-  - لعب ثنائي بين صديقين في المحادثات الخاصة أو المجموعات.
-  - اللعب ضد محرك شطرنج ذكي بمستويات صعوبة متعددة.
-- **توليد الرقعة الرسومية:** إنشاء وتحديث صور رقعة الشطرنج فورياً بعد كل حركة.
-- **التحقق من صحة القواعد والنقلات:** دعم قواعد الشطرنج الدولية (التبييت، الأخذ بالتجاوز، كش ملك، الترقية، وحالات التعادل).
-- **تصدير واستيراد PGN / FEN:** حفظ سجلات المباريات ومشاركتها بسهولة.
-- **سيرفر ويب صحي مدمج (Health Check Server):** يدعم الاستضافة المستمرة على منصات السحابة (Render, Koyeb, Railway, VPS).
+A full-featured Telegram Bot for playing and analyzing chess games directly inside Telegram chats, private groups, and supergroups using interactive inline keyboards and on-the-fly board rendering.
 
 ---
 
-## 🛠️ التقنيات المستخدمة (Tech Stack)
+## ✨ Features
 
-- **Language:** Python 3.10+
-- **Telegram Framework:** `pyTelegramBotAPI` (`telebot`)
-- **Chess Engine & Logic:** `python-chess`
-- **Deployment & Web Server:** Flask / Threading, Docker
+- **👥 Player vs Player (PvP):** Challenge friends in group chats or direct messages.
+- **🤖 Player vs AI (PvE):** Challenge an embedded chess engine with multiple difficulty levels.
+- **🎨 Dynamic Board Rendering:** Generates and delivers high-contrast chessboard images for every move.
+- **📋 International Chess Rules:** Complete enforcement of standard chess rules (En Passant, Castling, Pawn Promotion, 50-move rule, Threefold repetition).
+- **📜 PGN / FEN Support:** Export game transcripts or load custom board positions.
+- **🌐 Cloud-Ready Health Server:** Integrated Flask health check server for continuous cloud deployment (Koyeb, Render, Railway, VPS).
 
 ---
 
-## 🚀 التثبيت والتشغيل (Setup & Run)
+## 🚀 Quickstart
 
-### 1. المتطلبات
-- Python 3.10 أو أحدث
-- توكن بوت من [BotFather](https://t.me/BotFather)
-
-### 2. التثبيت المحلي
+### 1. Environment Setup
 ```bash
-# استنساخ المشروع
 git clone https://github.com/monestw-cell/chess-telegram-bot.git
 cd chess-telegram-bot
-
-# تثبيت الحزم المطلوبة
 pip install -r requirements.txt
+```
 
-# ضبط متغير البيئة وتشغيل البوت
-export BOT_TOKEN="your_telegram_bot_token"
+### 2. Configure Environment Variables
+```bash
+export BOT_TOKEN="your_telegram_bot_token_from_botfather"
 python main.py
 ```
 
-### 3. التشغيل عبر Docker
+### 3. Run with Docker
 ```bash
 docker build -t chess-telegram-bot .
-docker run -e BOT_TOKEN="your_telegram_bot_token" -p 8080:8080 chess-telegram-bot
+docker run -d -e BOT_TOKEN="your_token" -p 8080:8080 chess-telegram-bot
 ```
 
 ---
 
-## 📄 الترخيص (License)
-هذا المشروع مرخص تحت رخصة [MIT](LICENSE).
+## 📄 License
+Licensed under the [MIT License](LICENSE).
